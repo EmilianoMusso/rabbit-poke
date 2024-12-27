@@ -1,0 +1,8 @@
+﻿{
+  "Connection": "localhost",
+  "Exchange": null,
+  "TypeQueue": "",
+  "Message": null,
+  "ReplyTo": null,
+  "WaitSeconds": 15
+}
