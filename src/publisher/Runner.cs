@@ -1,31 +1,18 @@
-﻿using Microsoft.Extensions.Logging;
-using poke.Models;
+﻿using poke.Models;
 using poke.Services.Interfaces;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace poke;
-public class Runner
+public class Runner(ICmdLineService cmdLineService, IRabbitService rabbitService)
 {
-    private readonly ILogger<Runner> _logger;
-    private readonly ICmdLineService _cmdLineService;
-    private readonly IRabbitService _rabbitService;
-
-    public Runner(
-        ILogger<Runner> logger,
-        ICmdLineService cmdLineService,
-        IRabbitService rabbitService)
-    {
-        _logger = logger;
-        _cmdLineService = cmdLineService;
-        _rabbitService = rabbitService;
-    }
+    private readonly ICmdLineService _cmdLineService = cmdLineService;
+    private readonly IRabbitService _rabbitService = rabbitService;
 
     public async Task RunAsync()
     {
         await _cmdLineService.Process();
-
         await RunProcess(_cmdLineService.Options);
     }
 
@@ -36,31 +23,29 @@ public class Runner
 
     private async Task PublishMessage(CmdLineOptions options)
     {
-        if (string.IsNullOrEmpty(options.Connection)
-            || string.IsNullOrEmpty(options.TypeQueue)
-            || string.IsNullOrEmpty(options.Message))
+        if (AreParametersInvalid(options))
         {
-            _logger.LogError("One or more mandatory arguments was not specified.\nCheck for the following parameters:\n--connection\n--type\n--message");
+            await Console.Out.WriteLineAsync("One or more mandatory arguments was not specified.\nCheck for the following parameters:\n--connection\n--type\n--message");
             return;
         }
 
-        var message = new Message()
-        {
-            HostName = options.Connection,
-            Exchange = options.Exchange,
-            RoutingKey = options.TypeQueue,
-            Body = options.Message,
-            ReplyTo = options.ReplyTo
-        };
+        var message = Message.FromOptions(options);
 
         await _rabbitService.PublishAsync(message);
-        _logger.LogInformation("[{TimeStamp}] Event '{TypeName}' fired on bus", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), options.TypeQueue);
+        await Console.Out.WriteLineAsync($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Event '{options.TypeQueue}' published on bus");
 
         if (!string.IsNullOrEmpty(options.ReplyTo))
         {
             var _waitSeconds = options.WaitSeconds > 0 ? options.WaitSeconds : 15;
-            _logger.LogInformation("Waiting response for {WaitSeconds} seconds", _waitSeconds);
+            await Console.Out.WriteLineAsync($"Waiting response for {_waitSeconds} seconds");
             Thread.Sleep(_waitSeconds * 1000);
         }
+    }
+
+    private static bool AreParametersInvalid(CmdLineOptions options)
+    {
+        return string.IsNullOrEmpty(options.Connection)
+            || string.IsNullOrEmpty(options.TypeQueue)
+            || string.IsNullOrEmpty(options.Message);
     }
 }

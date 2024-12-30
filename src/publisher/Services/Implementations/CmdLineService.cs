@@ -7,15 +7,14 @@ using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace poke.Services.Implementations;
-public class CmdLineService : ICmdLineService
+public class CmdLineService(string[] args) : ICmdLineService
 {
-    private readonly string[] _arguments;
+    private readonly string[] _arguments = args;
 
     private readonly string[] _validOptions =
     [
         "--config",
         "--connection",
-        "--dll",
         "--type",
         "--message",
         "--exchange",
@@ -23,11 +22,6 @@ public class CmdLineService : ICmdLineService
         "--wait"
     ];
     public CmdLineOptions Options { get; set; } = new();
-
-    public CmdLineService(string[] args)
-    {
-        _arguments = args;
-    }
 
     public async Task Process()
     {

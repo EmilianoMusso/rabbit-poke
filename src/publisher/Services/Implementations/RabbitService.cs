@@ -28,29 +28,34 @@ public class RabbitService : IRabbitService
         if (!string.IsNullOrEmpty(message.ReplyTo))
         {
             props.ReplyTo = message.ReplyTo;
-
-            var consumer = new AsyncEventingBasicConsumer(channel);
-            consumer.ReceivedAsync += async (_, ea) =>
-            {
-                var body = ea.Body.ToArray();
-                var response = Encoding.UTF8.GetString(body);
-
-                await Console.Out.WriteLineAsync(response);
-            };
-
-            await channel.BasicConsumeAsync(queue: message.ReplyTo,
-                                 autoAck: true,
-                                 consumer: consumer);
+            await DeclareConsumer(channel, message.ReplyTo);
         }
 
         var messageBytes = Encoding.UTF8.GetBytes(message.Body);
 
-        await channel.BasicPublishAsync(exchange: message.Exchange ?? message.RoutingKey,
-                             message.RoutingKey,
-                             mandatory: true,
-                             basicProperties: props,
-                             body: messageBytes);
+        await channel.BasicPublishAsync(
+            exchange: message.Exchange,
+            message.RoutingKey,
+            mandatory: false,
+            basicProperties: props,
+            body: messageBytes);
+    }
 
-        await Task.CompletedTask;
+    private static async Task DeclareConsumer(IChannel channel, string replyTo)
+    {
+        var consumer = new AsyncEventingBasicConsumer(channel);
+        consumer.ReceivedAsync += async (_, ea) =>
+        {
+            var responseBody = ea.Body.ToArray();
+            var responseString = Encoding.UTF8.GetString(responseBody);
+
+            await Console.Out.WriteLineAsync(responseString);
+
+            await channel.BasicConsumeAsync(queue: replyTo,
+                                 autoAck: true,
+                                 consumer: consumer);
+        };
+
+        await channel.BasicConsumeAsync(queue: replyTo, autoAck: true, consumer: consumer);
     }
 }
